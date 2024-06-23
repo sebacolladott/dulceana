@@ -4,6 +4,7 @@ import "./index.css";
 import { RouterProvider, createHashRouter } from "react-router-dom";
 import { ErrorPage } from "./error-page";
 import { Root } from "./routes/root";
+import { Inventory } from "./routes/inventory";
 
 const router = createHashRouter([
   {
@@ -11,7 +12,7 @@ const router = createHashRouter([
     element: <Root />,
     errorElement: <ErrorPage />,
     children: [
-      { index: true, element: <>Inventory</> },
+      { index: true, element: <Inventory /> },
       { path: "/pos", element: <>POS</> },
     ],
   },
