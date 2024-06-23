@@ -21,6 +21,7 @@ import {
   ContextMenuTrigger,
 } from "../components/ContextMenu";
 import { Checkbox } from "../components/Checkbox";
+import { Input } from "../components/Input";
 
 const defaultData = [
   {
@@ -160,6 +161,14 @@ export const Inventory = () => {
     <>
       <div>Inventario</div>
       <div>
+        <Input
+          type="text"
+          value={table.getColumn("name")?.getFilterValue() ?? ""}
+          onChange={(e) =>
+            table.getColumn("name")?.setFilterValue(e.target.value)
+          }
+          className="max-w-xs"
+        />
         <Table className="table-fixed">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
