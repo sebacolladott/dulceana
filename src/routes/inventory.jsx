@@ -159,17 +159,19 @@ export const Inventory = () => {
 
   return (
     <>
-      <div>Inventario</div>
-      <div>
+      <div className="flex-shrink-0">
+        <div>Inventario</div>
         <Input
           type="text"
           value={table.getColumn("name")?.getFilterValue() ?? ""}
           onChange={(e) =>
             table.getColumn("name")?.setFilterValue(e.target.value)
           }
-          className="max-w-xs"
+          className="max-w-xs flex-shrink-0"
         />
-        <Table className="table-fixed">
+      </div>
+      <div className="flex-grow p-6 overflow-auto bg-gray-200">
+        <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -196,7 +198,7 @@ export const Inventory = () => {
                   {row.getVisibleCells().map((cell) => (
                     <ContextMenu key={cell.id}>
                       <ContextMenuTrigger asChild>
-                        <TableCell className="overflow-hidden text-nowrap">
+                        <TableCell>
                           {flexRender(
                             cell.column.columnDef.cell,
                             cell.getContext()

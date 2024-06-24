@@ -23,8 +23,13 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <RouterProvider router={router} />
   </React.StrictMode>
 );
-
-// Use contextBridge
-window.ipcRenderer.on("main-process-message", (_event, message) => {
-  console.log("message", message);
+window.ipcRenderer.invoke("getProducts").then((products) => {
+  console.log(products);
 });
+
+// window.ipcRenderer.invoke("createProduct", {
+//   barcode: "123456789",
+//   name: "Pan blanco",
+//   price: parseInt(2.99, 10),
+//   unit_of_measurement: "kg",
+// });
