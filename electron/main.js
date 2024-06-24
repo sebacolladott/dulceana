@@ -52,6 +52,10 @@ let win;
 function createWindow() {
   win = new BrowserWindow({
     icon: path.join(__dirname, "electron-vite.svg"),
+    minWidth: 800,
+    minHeight: 600,
+    width: 800,
+    height: 600,
     webPreferences: {
       preload: path.join(__dirname, "preload.mjs"),
       contextIsolation: true,
