@@ -45,8 +45,8 @@ export const PointOfSale = () => {
       <div className="shrink-0">
         <div>Punto de venta</div>
       </div>
-      <div className="flex">
-        <div className="grow overflow-auto">
+      <div className="grid grid-cols-2">
+        <div className="overflow-auto">
           <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {products.map(product => (
               <li
@@ -65,7 +65,7 @@ export const PointOfSale = () => {
             ))}
           </ul>
         </div>
-        <div className="w-1/3 bg-gray-100 p-6">
+        <div className="bg-gray-100 p-6">
           <h2 className="mb-4 text-2xl font-semibold">Orden actual</h2>
           <ul className="space-y-4">
             {cart.map(item => (
