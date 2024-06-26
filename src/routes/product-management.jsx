@@ -152,7 +152,7 @@ export const ProductManagement = () => {
   return (
     <>
       <div className="flex-shrink-0">
-        <div>Inventario</div>
+        <div>Gestión de productos</div>
         <Input
           type="text"
           value={table.getColumn('name')?.getFilterValue() ?? ''}
