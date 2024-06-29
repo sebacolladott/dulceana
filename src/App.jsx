@@ -1,5 +1,3 @@
-
-
 /*
 
 
@@ -124,7 +122,9 @@ const POS = () => {
 
   const handleAddToCart = async () => {
     try {
-      const response = await axios.get(`https://p102sdst-3000.brs.devtunnels.ms/barcode/${barcode}`);
+      const response = await axios.get(
+        `https://p102sdst-3000.brs.devtunnels.ms/barcode/${barcode}`
+      );
       const product = response.data;
       setCart(prevCart => [...prevCart, product]);
       setBarcode('');
@@ -226,5 +226,3 @@ function App() {
 }
 
 export default App;
-
-

@@ -1,29 +1,25 @@
-import { Link, Outlet } from 'react-router-dom';
+import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { buttonVariants } from '../components/Button';
+import { cn } from '../lib/cn';
 
 export const Root = () => {
+  const navigate = useNavigate();
   return (
     <>
-      {/* <!-- component --> */}
-      <div className="flex h-screen w-screen overflow-hidden text-gray-700">
-        {/* <!-- Component Start --> */}
-        <div className="flex w-16 flex-col items-center overflow-auto border-r border-gray-300 pb-4">
-          <Link
-            to={'/'}
-            className="mt-4 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded hover:bg-gray-300"
-          >
-            1
-          </Link>
-          <Link
-            to={'/pos'}
-            className="mt-4 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded hover:bg-gray-300"
-          >
-            2
-          </Link>
+      <div className="flex h-screen bg-gray-100">
+        <div className="flex w-[50px] flex-col items-center p-4">
+          <div className="space-y-4">
+            <Link to={'/'} className={cn(buttonVariants({ variant: 'outline', size: 'icon' }))}>
+              1
+            </Link>
+            <Link to={'/pos'} className={cn(buttonVariants({ variant: 'outline', size: 'icon' }))}>
+              2
+            </Link>
+          </div>
         </div>
-        <div className="flex flex-grow flex-col">
+        <main className="flex flex-grow">
           <Outlet />
-        </div>
-        {/* <!-- Component End  --> */}
+        </main>
       </div>
     </>
   );

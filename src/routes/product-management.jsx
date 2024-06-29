@@ -151,60 +151,58 @@ export const ProductManagement = () => {
 
   return (
     <>
-      <div className="flex-shrink-0">
-        <div>Gestión de productos</div>
-        <Input
-          type="text"
-          value={table.getColumn('name')?.getFilterValue() ?? ''}
-          onChange={e => table.getColumn('name')?.setFilterValue(e.target.value)}
-          className="max-w-xs flex-shrink-0"
-        />
-      </div>
-      <div className="flex-grow overflow-auto p-6">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map(headerGroup => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map(header => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
+      <div className="flex h-full w-full flex-col py-4">
+        <div className="flex flex-row px-2">
+          <Input type="text" placeholder="Buscar productos..." />
+        </div>
+        <div className="mt-4 h-full overflow-hidden">
+          <div className="h-full overflow-y-auto px-2">
+            <Table>
+              <TableHeader>
+                {table.getHeaderGroups().map(headerGroup => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map(header => (
+                      <TableHead key={header.id}>
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(header.column.columnDef.header, header.getContext())}
+                      </TableHead>
+                    ))}
+                  </TableRow>
                 ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map(row => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
-                  {row.getVisibleCells().map(cell => (
-                    <ContextMenu key={cell.id}>
-                      <ContextMenuTrigger asChild>
-                        <TableCell>
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      </ContextMenuTrigger>
-                      <ContextMenuContent className="w-64">
-                        <ContextMenuItem>Editar</ContextMenuItem>
+              </TableHeader>
+              <TableBody>
+                {table.getRowModel().rows.length ? (
+                  table.getRowModel().rows.map(row => (
+                    <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
+                      {row.getVisibleCells().map(cell => (
+                        <ContextMenu key={cell.id}>
+                          <ContextMenuTrigger asChild>
+                            <TableCell>
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </TableCell>
+                          </ContextMenuTrigger>
+                          <ContextMenuContent className="w-64">
+                            <ContextMenuItem>Editar</ContextMenuItem>
 
-                        <ContextMenuSeparator />
-                        <ContextMenuItem>Eliminar</ContextMenuItem>
-                      </ContextMenuContent>
-                    </ContextMenu>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No se han encontrado resultados.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+                            <ContextMenuSeparator />
+                            <ContextMenuItem>Eliminar</ContextMenuItem>
+                          </ContextMenuContent>
+                        </ContextMenu>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={columns.length} className="h-24 text-center">
+                      No se han encontrado resultados.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
       </div>
     </>
   );
