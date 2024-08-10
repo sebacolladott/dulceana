@@ -4,12 +4,11 @@
  * la IPC (Comunicación Inter-Proceso) entre los procesos principal y de renderizado.
  */
 
-import { app, BrowserWindow, ipcMain } from 'electron';
-import { autoUpdater } from 'electron-updater';
+import { app, BrowserWindow, ipcMain, Notification } from 'electron';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { print } from './printer';
+import { PosPrinter } from './printer';
 
 // Configuración para usar require en un módulo ES
 const require = createRequire(import.meta.url);
@@ -19,10 +18,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const knex = require('knex')({
   client: 'better-sqlite3',
   connection: {
-    filename: path.join(__dirname, 'dulceana.sqlite')
+    filename: path.join(__dirname, 'store.sqlite')
   },
   useNullAsDefault: true
 });
+
+// Inicializar módulo de impresión
+const posPrinter = new PosPrinter();
 
 // Configuración de rutas y variables de entorno
 process.env.APP_ROOT = path.join(__dirname, '..');
@@ -35,70 +37,22 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 
 let mainWindow;
 
-function setupAutoUpdater() {
-  // Configura el registro de eventos del auto-actualizador
-  autoUpdater.logger = require('electron-log');
-  autoUpdater.logger.transports.file.level = 'info';
-
-  // Configura los eventos del auto-actualizador
-  autoUpdater.on('checking-for-update', () => {
-    sendStatusToWindow('Checking for update...');
-  });
-  autoUpdater.on('update-available', info => {
-    sendStatusToWindow('Update available.');
-  });
-  autoUpdater.on('update-not-available', info => {
-    sendStatusToWindow('Update not available.');
-  });
-  autoUpdater.on('error', err => {
-    sendStatusToWindow('Error in auto-updater. ' + err);
-  });
-  autoUpdater.on('download-progress', progressObj => {
-    let log_message = 'Download speed: ' + progressObj.bytesPerSecond;
-    log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
-    log_message = log_message + ' (' + progressObj.transferred + '/' + progressObj.total + ')';
-    sendStatusToWindow(log_message);
-  });
-  autoUpdater.on('update-downloaded', info => {
-    sendStatusToWindow('Update downloaded');
-  });
-
-  // Inicia la comprobación de actualizaciones
-  autoUpdater.checkForUpdatesAndNotify();
-}
-
-/**
- * Envía mensajes de estado a la ventana principal.
- * @param {string} text - El mensaje de estado.
- */
-function sendStatusToWindow(text) {
-  console.log(text);
-  if (mainWindow) {
-    mainWindow.webContents.send('update-message', text);
-  }
-}
-
 /**
  * Crea la ventana principal de la aplicación.
  */
 const createWindow = () => {
   mainWindow = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
-    minWidth: 800,
-    minHeight: 600,
     titleBarStyle: 'hidden',
     titleBarOverlay: {
       color: '#09090B',
       symbolColor: '#FAFAFA',
-      height: 30
+      height: 32
     },
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs')
     }
   });
-
-  mainWindow.maximize();
-  mainWindow.show();
 
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow?.webContents.send('main-process-message', new Date().toLocaleString());
@@ -110,7 +64,10 @@ const createWindow = () => {
     mainWindow.loadFile(path.join(RENDERER_DIST, 'index.html'));
   }
 
-  setupAutoUpdater();
+  // mainWindow.webContents.getPrintersAsync().then(data => {
+  //   // data will be an array of printer objects}
+  //   console.log(data);
+  // });
 };
 
 /**
@@ -221,7 +178,78 @@ const createCategoriesTable = async () => {
   });
 };
 
-const defaultSettings = { printerName: '', pageSize: 70, preview: false, copies: 1 };
+const defaultSettings = {
+  // Información de la tienda
+  storeName: 'Mi Tienda',
+  storeSlogan: 'La mejor calidad al mejor precio',
+  address: 'Calle Principal 123, Ciudad, País',
+  phone: '123-456-7890',
+  email: 'contacto@mitienda.com',
+  website: 'www.mitienda.com',
+
+  // Configuraciones fiscales y monetarias
+  taxRate: 0.1,
+  currency: 'USD',
+  currencySymbol: '$',
+  decimalSeparator: '.',
+  thousandsSeparator: ',',
+
+  // Configuraciones de la aplicación
+  language: 'es',
+  theme: 'light',
+  dateFormat: 'DD/MM/YYYY',
+  timeFormat: 'HH:mm:ss',
+
+  // Configuraciones de impresión
+  printerName: 'Impresora POS',
+  receiptWidth: 40, // Ancho del recibo en caracteres
+  receiptHeader: '*** MI TIENDA ***\n',
+  receiptFooter: '\n¡Gracias por su compra!\nVuelva pronto',
+
+  // Configuraciones de inventario
+  lowStockThreshold: 10,
+  enableStockAlerts: true,
+
+  // Configuraciones de ventas
+  allowReturnWithoutReceipt: false,
+  returnPeriod: 30, // Días
+
+  // Configuraciones de seguridad
+  requirePasswordForRefunds: true,
+  sessionTimeout: 15, // Minutos
+
+  // Configuraciones de fidelización de clientes
+  enableLoyaltyProgram: true,
+  pointsPerDollar: 1,
+
+  // Configuraciones de descuentos
+  enableBulkDiscounts: true,
+  seniorDiscountPercent: 10,
+
+  // Configuraciones de backups
+  enableAutomaticBackups: true,
+  backupFrequency: 'daily', // 'daily', 'weekly', 'monthly'
+
+  // Configuraciones de reportes
+  defaultReportPeriod: 'monthly', // 'daily', 'weekly', 'monthly', 'yearly'
+
+  // Configuraciones de notificaciones
+  enableEmailNotifications: false,
+  notificationEmail: 'admin@mitienda.com',
+
+  // Configuraciones de integración
+  enableOnlineSync: false,
+  apiKey: '',
+
+  // Configuraciones de empleados
+  trackEmployeeHours: true,
+
+  // Configuraciones de métodos de pago
+  acceptCreditCards: true,
+  acceptCash: true,
+  acceptChecks: false,
+  acceptMobilePayments: false
+};
 
 const setupSettings = async () => {
   try {
@@ -241,25 +269,26 @@ const setupSettings = async () => {
     }
   } catch (error) {
     console.error('Error initializing settings:', error);
-    throw new Error('Failed to set up application settings: ' + error.message);
+    throw new Error(
+      'Failed to set up application settings. Please check the database connection and try again.'
+    );
   }
 };
 
 const setupDatabase = async () => {
-  try {
-    await createProductsTable();
-    await createSalesTable();
-    await createSaleItemsTable();
-    await createInventoryTable();
-    await createSettingsTable();
-    await createCategoriesTable();
-    await setupSettings();
-    console.log('Database initialized successfully.');
-  } catch (error) {
-    console.error('Error initializing database:', error);
-    // Instead of throwing, we'll log the error and allow the application to continue
-    console.error('Application will continue, but some features may not work correctly.');
-  }
+  return createProductsTable()
+    .then(createSalesTable)
+    .then(createSaleItemsTable)
+    .then(createInventoryTable)
+    .then(createSettingsTable)
+    .then(createCategoriesTable)
+    .then(() => {
+      console.log('Database initialized successfully.');
+    })
+    .catch(error => {
+      console.error('Error initializing database:', error);
+      throw error;
+    });
 };
 
 /**
@@ -488,17 +517,9 @@ const generateInventoryReport = async () => {
  * Recupera todas las configuraciones de la aplicación.
  * @returns {Promise<Array>} Una promesa que se resuelve con un array de todas las configuraciones.
  */
-const getSettings = async (keys = null) => {
+const getSettings = async () => {
   try {
-    let query = knex('settings');
-    if (keys) {
-      query = query.whereIn('key', keys);
-    }
-    const settings = await query.select();
-    return settings.reduce((acc, { key, value }) => {
-      acc[key] = JSON.parse(value);
-      return acc;
-    }, {});
+    return await knex('settings').select();
   } catch (error) {
     console.error('Error getting settings:', error);
     throw new Error('Internal server error');
@@ -729,21 +750,6 @@ ipcMain.handle('reports:inventory', () => generateInventoryReport());
 ipcMain.handle('settings:get', () => getSettings());
 
 /**
- * Recupera las configuraciones específicas de la impresora.
- * Canal: 'settings:getPrinter'
- * @returns {Promise<Object>} Una promesa que se resuelve con un objeto que contiene las configuraciones de la impresora.
- * Las claves del objeto incluyen:
- * - printerName: El nombre de la impresora seleccionada.
- * - receiptWidth: El ancho del recibo en caracteres.
- * - preview: Booleano que indica si se debe mostrar una vista previa antes de imprimir.
- * - copies: El número de copias a imprimir.
- */
-ipcMain.handle('settings:getPrinter', async () => {
-  const printerKeys = ['printerName', 'pageSize', 'preview', 'copies'];
-  return getSettings(printerKeys);
-});
-
-/**
  * Actualiza las configuraciones de la aplicación.
  * Canal: 'settings:update'
  * @param {Object} event - El objeto del evento IPC.
@@ -796,15 +802,6 @@ ipcMain.handle('categories:delete', (event, { id }) => deleteCategory(id));
 // Manejador de Impresión
 
 /**
- * Recupera todas las impresoras disponibles en el sistema.
- * Canal: 'printers:getAll'
- * @returns {Promise<Array<Object>>} Una promesa que se resuelve con un array de objetos de impresora.
- */
-ipcMain.handle('printers:getAll', async () => {
-  return mainWindow.webContents.getPrintersAsync();
-});
-
-/**
  * Maneja las solicitudes de impresión del proceso de renderizado.
  * Canal: 'print'
  * @param {Object} event - El objeto del evento IPC.
@@ -812,9 +809,9 @@ ipcMain.handle('printers:getAll', async () => {
  * @param {Object} options - Opciones de impresión.
  * @returns {Promise<Object>} Una promesa que se resuelve con el resultado de la impresión.
  */
-ipcMain.handle('print:execute', async (event, data, options) => {
+ipcMain.handle('print', async (event, data, options) => {
   try {
-    await print(data, options);
+    await posPrinter.print(data, options);
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
@@ -842,12 +839,12 @@ app.on('activate', () => {
   }
 });
 
-// const NOTIFICATION_TITLE = 'Basic Notification';
-// const NOTIFICATION_BODY = 'Notification from the Main process';
+const NOTIFICATION_TITLE = 'Basic Notification';
+const NOTIFICATION_BODY = 'Notification from the Main process';
 
-// function showNotification() {
-//   new Notification({ title: NOTIFICATION_TITLE, body: NOTIFICATION_BODY }).show();
-// }
+function showNotification() {
+  new Notification({ title: NOTIFICATION_TITLE, body: NOTIFICATION_BODY }).show();
+}
 
 /**
  * Inicializa la aplicación.
@@ -862,14 +859,5 @@ app
     createWindow();
   })
   .then(() => {
-    // Comprueba actualizaciones cada hora
-    setInterval(
-      () => {
-        autoUpdater.checkForUpdatesAndNotify();
-      },
-      60 * 60 * 1000
-    );
+    showNotification();
   });
-// .then(() => {
-//   showNotification();
-// });
