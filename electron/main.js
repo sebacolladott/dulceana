@@ -4,8 +4,7 @@
  * la IPC (Comunicación Inter-Proceso) entre los procesos principal y de renderizado.
  */
 
-import { app, BrowserWindow, ipcMain } from 'electron';
-import { autoUpdater } from 'electron-updater';
+import { app, autoUpdater, BrowserWindow, dialog, ipcMain } from 'electron';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,50 +32,46 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, 'public')
   : RENDERER_DIST;
 
-let mainWindow;
-
-function setupAutoUpdater() {
-  // Configura el registro de eventos del auto-actualizador
-  autoUpdater.logger = require('electron-log');
-  autoUpdater.logger.transports.file.level = 'info';
-
-  // Configura los eventos del auto-actualizador
-  autoUpdater.on('checking-for-update', () => {
-    sendStatusToWindow('Checking for update...');
-  });
-  autoUpdater.on('update-available', info => {
-    sendStatusToWindow('Update available.');
-  });
-  autoUpdater.on('update-not-available', info => {
-    sendStatusToWindow('Update not available.');
-  });
-  autoUpdater.on('error', err => {
-    sendStatusToWindow('Error in auto-updater. ' + err);
-  });
-  autoUpdater.on('download-progress', progressObj => {
-    let log_message = 'Download speed: ' + progressObj.bytesPerSecond;
-    log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
-    log_message = log_message + ' (' + progressObj.transferred + '/' + progressObj.total + ')';
-    sendStatusToWindow(log_message);
-  });
-  autoUpdater.on('update-downloaded', info => {
-    sendStatusToWindow('Update downloaded');
-  });
-
-  // Inicia la comprobación de actualizaciones
-  autoUpdater.checkForUpdatesAndNotify();
-}
+// Configuración del Auto-Updater
+const server = 'https://your-deployment-url.com';
+const url = `${server}/update/${process.platform}/${app.getVersion()}`;
+autoUpdater.setFeedURL({ url });
 
 /**
- * Envía mensajes de estado a la ventana principal.
- * @param {string} text - El mensaje de estado.
+ * Inicia el proceso de comprobación de actualizaciones.
  */
-function sendStatusToWindow(text) {
-  console.log(text);
-  if (mainWindow) {
-    mainWindow.webContents.send('update-message', text);
-  }
+function checkForUpdates() {
+  autoUpdater.checkForUpdates();
 }
+
+let mainWindow;
+
+/**
+ * Manejador de eventos para cuando se ha descargado una actualización.
+ * Muestra un diálogo al usuario para reiniciar la aplicación.
+ */
+autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName) => {
+  const dialogOpts = {
+    type: 'info',
+    buttons: ['Reiniciar', 'Más tarde'],
+    title: 'Actualización de la aplicación',
+    message: process.platform === 'win32' ? releaseNotes : releaseName,
+    detail:
+      'Una nueva versión ha sido descargada. Reinicie la aplicación para aplicar las actualizaciones.'
+  };
+
+  dialog.showMessageBox(dialogOpts).then(returnValue => {
+    if (returnValue.response === 0) autoUpdater.quitAndInstall();
+  });
+});
+
+/**
+ * Manejador de errores para el proceso de actualización.
+ */
+autoUpdater.on('error', message => {
+  console.error('Hubo un problema al actualizar la aplicación');
+  console.error(message);
+});
 
 /**
  * Crea la ventana principal de la aplicación.
@@ -110,7 +105,13 @@ const createWindow = () => {
     mainWindow.loadFile(path.join(RENDERER_DIST, 'index.html'));
   }
 
-  setupAutoUpdater();
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow?.webContents.send('main-process-message', new Date().toLocaleString());
+    // Inicia la comprobación de actualizaciones
+    checkForUpdates();
+    // Configura una comprobación periódica (por ejemplo, cada hora)
+    setInterval(checkForUpdates, 3600000);
+  });
 };
 
 /**
@@ -585,233 +586,54 @@ const deleteCategory = async id => {
   }
 };
 
+// Manejadores de IPC
+
 // Manejadores de Productos
-
-/**
- * Recupera todos los productos de la base de datos.
- * Canal: 'products:getAll'
- * @returns {Promise<Array>} Una promesa que se resuelve con un array de todos los productos.
- */
 ipcMain.handle('products:getAll', () => getAllProducts());
-
-/**
- * Recupera un producto por su ID.
- * Canal: 'products:getById'
- * @param {Object} event - El objeto del evento IPC.
- * @param {Object} payload - El objeto de carga.
- * @param {string} payload.id - El UUID del producto.
- * @returns {Promise<Object>} Una promesa que se resuelve con el objeto del producto o un mensaje de no encontrado.
- */
 ipcMain.handle('products:getById', (event, { id }) => getProductById(id));
-
-/**
- * Recupera un producto por su código de barras.
- * Canal: 'products:getByBarcode'
- * @param {Object} event - El objeto del evento IPC.
- * @param {Object} payload - El objeto de carga.
- * @param {string} payload.barcode - El código de barras del producto.
- * @returns {Promise<Object>} Una promesa que se resuelve con el objeto del producto o un mensaje de no encontrado.
- */
 ipcMain.handle('products:getByBarcode', (event, { barcode }) => getProductByBarcode(barcode));
-
-/**
- * Crea un nuevo producto en la base de datos.
- * Canal: 'products:create'
- * @param {Object} event - El objeto del evento IPC.
- * @param {Object} productData - Los datos para el nuevo producto.
- * @returns {Promise<Object>} Una promesa que se resuelve con el producto creado y un mensaje de éxito.
- */
 ipcMain.handle('products:create', (event, productData) => createProduct(productData));
-
-/**
- * Actualiza un producto existente en la base de datos.
- * Canal: 'products:update'
- * @param {Object} event - El objeto del evento IPC.
- * @param {Object} payload - El objeto de carga.
- * @param {string} payload.id - El UUID del producto a actualizar.
- * @param {Object} payload.productData - Los datos actualizados para el producto.
- * @returns {Promise<Object>} Una promesa que se resuelve con un mensaje de éxito o de no encontrado.
- */
 ipcMain.handle('products:update', (event, { id, productData }) => updateProduct(id, productData));
-
-/**
- * Elimina un producto de la base de datos.
- * Canal: 'products:delete'
- * @param {Object} event - El objeto del evento IPC.
- * @param {Object} payload - El objeto de carga.
- * @param {string} payload.id - El UUID del producto a eliminar.
- * @returns {Promise<Object>} Una promesa que se resuelve con un mensaje de éxito o de no encontrado.
- */
 ipcMain.handle('products:delete', (event, { id }) => deleteProduct(id));
 
 // Manejadores de Ventas
-
-/**
- * Crea una nueva transacción de venta.
- * Canal: 'sales:create'
- * @param {Object} event - El objeto del evento IPC.
- * @param {Object} saleData - Los datos para la nueva venta, incluyendo los artículos vendidos.
- * @returns {Promise<Object>} Una promesa que se resuelve con el objeto de venta creado.
- */
 ipcMain.handle('sales:create', (event, saleData) => createSale(saleData));
-
-/**
- * Recupera todas las ventas de la base de datos.
- * Canal: 'sales:getAll'
- * @returns {Promise<Array>} Una promesa que se resuelve con un array de todas las ventas.
- */
 ipcMain.handle('sales:getAll', () => getAllSales());
-
-/**
- * Recupera una venta específica por su ID.
- * Canal: 'sales:getById'
- * @param {Object} event - El objeto del evento IPC.
- * @param {Object} payload - El objeto de carga.
- * @param {string} payload.id - El UUID de la venta.
- * @returns {Promise<Object>} Una promesa que se resuelve con el objeto de la venta.
- */
 ipcMain.handle('sales:getById', (event, { id }) => getSaleById(id));
 
 // Manejadores de Inventario
-
-/**
- * Actualiza la cantidad de inventario para un producto específico.
- * Canal: 'inventory:update'
- * @param {Object} event - El objeto del evento IPC.
- * @param {Object} payload - El objeto de carga.
- * @param {string} payload.productId - El UUID del producto.
- * @param {number} payload.quantity - La nueva cantidad.
- * @returns {Promise<Object>} Una promesa que se resuelve con el objeto de inventario actualizado.
- */
 ipcMain.handle('inventory:update', (event, { productId, quantity }) =>
   updateInventory(productId, quantity)
 );
-
-/**
- * Recupera el inventario actual para un producto específico.
- * Canal: 'inventory:get'
- * @param {Object} event - El objeto del evento IPC.
- * @param {Object} payload - El objeto de carga.
- * @param {string} payload.productId - El UUID del producto.
- * @returns {Promise<Object>} Una promesa que se resuelve con el objeto de inventario.
- */
 ipcMain.handle('inventory:get', (event, { productId }) => getInventory(productId));
 
 // Manejadores de Informes
-
-/**
- * Genera un informe de ventas para un rango de fechas dado.
- * Canal: 'reports:sales'
- * @param {Object} event - El objeto del evento IPC.
- * @param {Object} payload - El objeto de carga.
- * @param {Date} payload.startDate - La fecha de inicio del período del informe.
- * @param {Date} payload.endDate - La fecha de fin del período del informe.
- * @returns {Promise<Object>} Una promesa que se resuelve con los datos del informe de ventas.
- */
 ipcMain.handle('reports:sales', (event, { startDate, endDate }) =>
   generateSalesReport(startDate, endDate)
 );
-
-/**
- * Genera un informe del inventario actual.
- * Canal: 'reports:inventory'
- * @returns {Promise<Array>} Una promesa que se resuelve con los datos del informe de inventario.
- */
 ipcMain.handle('reports:inventory', () => generateInventoryReport());
 
 // Manejadores de Configuraciones
-
-/**
- * Recupera todas las configuraciones de la aplicación.
- * Canal: 'settings:get'
- * @returns {Promise<Array>} Una promesa que se resuelve con un array de todas las configuraciones.
- */
 ipcMain.handle('settings:get', () => getSettings());
-
-/**
- * Recupera las configuraciones específicas de la impresora.
- * Canal: 'settings:getPrinter'
- * @returns {Promise<Object>} Una promesa que se resuelve con un objeto que contiene las configuraciones de la impresora.
- * Las claves del objeto incluyen:
- * - printerName: El nombre de la impresora seleccionada.
- * - receiptWidth: El ancho del recibo en caracteres.
- * - preview: Booleano que indica si se debe mostrar una vista previa antes de imprimir.
- * - copies: El número de copias a imprimir.
- */
 ipcMain.handle('settings:getPrinter', async () => {
   const printerKeys = ['printerName', 'pageSize', 'preview', 'copies'];
   return getSettings(printerKeys);
 });
-
-/**
- * Actualiza las configuraciones de la aplicación.
- * Canal: 'settings:update'
- * @param {Object} event - El objeto del evento IPC.
- * @param {Object} settingsData - Un objeto que contiene las configuraciones a actualizar.
- * @returns {Promise<Object>} Una promesa que se resuelve con un mensaje de éxito.
- */
 ipcMain.handle('settings:update', (event, settingsData) => updateSettings(settingsData));
 
 // Manejadores de Categorías
-
-/**
- * Recupera todas las categorías de productos.
- * Canal: 'categories:getAll'
- * @returns {Promise<Array>} Una promesa que se resuelve con un array de todas las categorías.
- */
 ipcMain.handle('categories:getAll', () => getAllCategories());
-
-/**
- * Crea una nueva categoría de producto.
- * Canal: 'categories:create'
- * @param {Object} event - El objeto del evento IPC.
- * @param {Object} categoryData - Los datos para la nueva categoría.
- * @returns {Promise<Object>} Una promesa que se resuelve con el objeto de la categoría creada.
- */
 ipcMain.handle('categories:create', (event, categoryData) => createCategory(categoryData));
-
-/**
- * Actualiza una categoría de producto existente.
- * Canal: 'categories:update'
- * @param {Object} event - El objeto del evento IPC.
- * @param {Object} payload - El objeto de carga.
- * @param {string} payload.id - El UUID de la categoría a actualizar.
- * @param {Object} payload.categoryData - Los datos actualizados para la categoría.
- * @returns {Promise<Object>} Una promesa que se resuelve con el objeto de la categoría actualizada.
- */
 ipcMain.handle('categories:update', (event, { id, categoryData }) =>
   updateCategory(id, categoryData)
 );
-
-/**
- * Elimina una categoría de producto.
- * Canal: 'categories:delete'
- * @param {Object} event - El objeto del evento IPC.
- * @param {Object} payload - El objeto de carga.
- * @param {string} payload.id - El UUID de la categoría a eliminar.
- * @returns {Promise<Object>} Una promesa que se resuelve con un mensaje de éxito.
- */
 ipcMain.handle('categories:delete', (event, { id }) => deleteCategory(id));
 
 // Manejador de Impresión
-
-/**
- * Recupera todas las impresoras disponibles en el sistema.
- * Canal: 'printers:getAll'
- * @returns {Promise<Array<Object>>} Una promesa que se resuelve con un array de objetos de impresora.
- */
 ipcMain.handle('printers:getAll', async () => {
   return mainWindow.webContents.getPrintersAsync();
 });
 
-/**
- * Maneja las solicitudes de impresión del proceso de renderizado.
- * Canal: 'print'
- * @param {Object} event - El objeto del evento IPC.
- * @param {Object} data - Los datos a imprimir.
- * @param {Object} options - Opciones de impresión.
- * @returns {Promise<Object>} Una promesa que se resuelve con el resultado de la impresión.
- */
 ipcMain.handle('print:execute', async (event, data, options) => {
   try {
     await print(data, options);
@@ -842,13 +664,6 @@ app.on('activate', () => {
   }
 });
 
-// const NOTIFICATION_TITLE = 'Basic Notification';
-// const NOTIFICATION_BODY = 'Notification from the Main process';
-
-// function showNotification() {
-//   new Notification({ title: NOTIFICATION_TITLE, body: NOTIFICATION_BODY }).show();
-// }
-
 /**
  * Inicializa la aplicación.
  * Configura la base de datos y crea la ventana principal cuando la aplicación está lista.
@@ -860,16 +675,59 @@ app
   })
   .then(() => {
     createWindow();
+
+    // Solo comprueba actualizaciones en la versión empaquetada
+    if (app.isPackaged) {
+      autoUpdater.checkForUpdates();
+    }
   })
-  .then(() => {
-    // Comprueba actualizaciones cada hora
-    setInterval(
-      () => {
-        autoUpdater.checkForUpdatesAndNotify();
-      },
-      60 * 60 * 1000
-    );
+  .catch(error => {
+    console.error('Error durante la inicialización de la aplicación:', error);
   });
-// .then(() => {
-//   showNotification();
-// });
+
+/**
+ * Función para manejar errores no capturados en la aplicación.
+ * @param {string} error - El mensaje de error.
+ * @param {string} url - La URL donde ocurrió el error.
+ * @param {number} line - El número de línea donde ocurrió el error.
+ */
+process.on('uncaughtException', (error, url, line) => {
+  console.error('Excepción no capturada:', error, 'en', url, 'línea', line);
+  // Aquí podrías implementar un sistema de registro de errores más robusto
+  // como enviar el error a un servicio de seguimiento de errores
+});
+
+/**
+ * Función para manejar promesas rechazadas no capturadas.
+ * @param {Object} reason - El objeto que contiene la razón del rechazo.
+ * @param {Promise} promise - La promesa rechazada.
+ */
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Promesa rechazada no manejada:', promise, 'razón:', reason);
+  // Aquí también podrías implementar un sistema de registro de errores más robusto
+});
+
+// Exporta las funciones y variables necesarias para pruebas o uso en otros módulos
+export {
+  createCategory,
+  createProduct,
+  createSale,
+  createWindow,
+  deleteCategory,
+  deleteProduct,
+  generateInventoryReport,
+  generateSalesReport,
+  getAllCategories,
+  getAllProducts,
+  getAllSales,
+  getInventory,
+  getProductByBarcode,
+  getProductById,
+  getSaleById,
+  getSettings,
+  setupDatabase,
+  updateCategory,
+  updateInventory,
+  updateProduct,
+  updateSettings
+};
